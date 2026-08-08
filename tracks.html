@@ -281,6 +281,20 @@ const TRACKS = [
   },
 ];
 
+const TRACK_IDS = [
+  'prologue',
+  'track01',
+  'track02',
+  'track03',
+  'track04',
+  'track05',
+  'track06',
+  'track07',
+  'track08',
+  'track09',
+  'epilogue',
+];
+
 const list = document.getElementById('tracksList');
 
 TRACKS.forEach((track, i) => {
@@ -289,13 +303,16 @@ TRACKS.forEach((track, i) => {
   if (track.special) classes.push('special');
   if (!track.published) classes.push('locked');
   li.className = classes.join(' ');
+  li.id = TRACK_IDS[i];
   li.style.animationDelay = (i * 0.05) + 's';
 
   const hasDetail = track.synopsis || track.character;
 
   li.innerHTML = `
     <div class="track-card-header">
-      <span class="track-num">${track.special ? '' : track.num}</span>
+      ${track.special
+        ? '<span class="track-num" aria-hidden="true"></span>'
+        : `<span class="track-num">${track.num}</span>`}
       <span class="track-name" ${track.special ? 'style="color:var(--purple);font-weight:700;letter-spacing:0.1em;"' : ''}>${track.name}</span>
       ${track.published ? `
       <div class="track-actions">
@@ -351,6 +368,67 @@ TRACKS.forEach((track, i) => {
 
   list.appendChild(li);
 });
+
+let hashNavigationSequence = 0;
+
+function scrollToTrackWithHeaderOffset(trackCard) {
+  const nav = document.querySelector('.nav');
+  const headerHeight = nav ? nav.getBoundingClientRect().height : 0;
+  const top = window.scrollY + trackCard.getBoundingClientRect().top - headerHeight;
+  window.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
+}
+
+function openTrackFromHash() {
+  const id = window.location.hash.slice(1);
+  if (!id) return;
+
+  const trackCard = document.getElementById(id);
+  if (!trackCard || !trackCard.classList.contains('track-card')) return;
+
+  const sequence = ++hashNavigationSequence;
+  const wasOpen = trackCard.classList.contains('open');
+
+  document.querySelectorAll('.track-card.open').forEach(el => {
+    if (el !== trackCard) el.classList.remove('open');
+  });
+  trackCard.classList.add('open');
+
+  const detail = trackCard.querySelector('.track-detail');
+  const scrollIfCurrent = () => {
+    if (sequence !== hashNavigationSequence || window.location.hash !== `#${id}`) return;
+    window.requestAnimationFrame(() => scrollToTrackWithHeaderOffset(trackCard));
+  };
+
+  if (wasOpen || !detail) {
+    scrollIfCurrent();
+    return;
+  }
+
+  let finished = false;
+  let fallbackTimer;
+  const finishAfterExpansion = () => {
+    if (finished) return;
+    finished = true;
+    detail.removeEventListener('transitionend', onTransitionEnd);
+    window.clearTimeout(fallbackTimer);
+    scrollIfCurrent();
+  };
+  const onTransitionEnd = event => {
+    if (event.target === detail && event.propertyName === 'max-height') {
+      finishAfterExpansion();
+    }
+  };
+
+  detail.addEventListener('transitionend', onTransitionEnd);
+  fallbackTimer = window.setTimeout(finishAfterExpansion, 550);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', openTrackFromHash, { once: true });
+} else {
+  openTrackFromHash();
+}
+window.addEventListener('hashchange', openTrackFromHash);
 
 </script>
 </body>
