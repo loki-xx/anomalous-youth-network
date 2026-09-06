@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LYRICS ARCHIVE — 青春異常論</title>
+  <meta name="description" content="青春異常論 歌詞記録" />
+  <link rel="stylesheet" href="lyrics.css" />
+</head>
+<body>
+  <header class="archive-header">
+    <a class="archive-logo" href="index.html">青春異常論</a>
+    <nav class="archive-nav" aria-label="ページナビゲーション">
+      <a href="tracks.html">TRACKS</a>
+      <a href="index.html">TOP</a>
+    </nav>
+  </header>
+
+  <main class="archive-main">
+    <header class="page-heading">
+      <p class="record-code">DOCUMENT / AYN-LYR-011</p>
+      <h1>LYRICS ARCHIVE</h1>
+      <p class="page-subtitle">全記録・再生順</p>
+    </header>
+
+    <div class="lyrics-list" id="lyrics-list" aria-live="polite">
+      <p class="loading-message">記録を読み込んでいます。</p>
+    </div>
+
+    <section class="access-section" aria-label="記録照合">
+      <p class="access-description">観測記録 #033 は封鎖されている。照合キーは物理媒体上に記録されている。</p>
+      <div class="access-controls" id="access-controls">
+        <div class="access-entry">
+          <input
+            class="access-input"
+            id="access-input"
+            type="text"
+            aria-label="入力"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button class="access-submit" id="access-submit" type="button">照合</button>
+        </div>
+        <p class="access-message" id="access-message" role="status" aria-live="polite"></p>
+      </div>
+
+      <div id="hidden-content" class="hidden-content" hidden>
+        <h2>観測記録 #033</h2>
+        <p>（本文は後日追記）</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="archive-footer">
+    © 低めの猫 / Mistoria — 青春異常論 / Anomalous Youth Network
+  </footer>
+
+  <script>
+    const lyricsList = document.getElementById('lyrics-list');
+
+    async function loadLyrics() {
+      try {
+        const response = await fetch('lyrics.txt');
+        if (!response.ok) throw new Error('Request failed');
+
+        const source = await response.text();
+        const blocks = source.trim().split(/\r?\n(?=##\s+)/);
+        const fragment = document.createDocumentFragment();
+
+        blocks.forEach(block => {
+          const lines = block.split(/\r?\n/);
+          const match = lines.shift().match(/^##\s+(\d+)\s+(.+)$/);
+          if (!match) return;
+
+          const article = document.createElement('article');
+          article.className = 'lyrics-record';
+
+          const heading = document.createElement('header');
+          heading.className = 'lyrics-heading';
+
+          const title = document.createElement('h2');
+          const toggle = document.createElement('button');
+          toggle.className = 'lyrics-toggle';
+          toggle.type = 'button';
+          toggle.setAttribute('aria-expanded', 'false');
+
+          const number = document.createElement('span');
+          number.className = 'lyrics-number';
+          number.textContent = `TRACK ${match[1]}`;
+
+          const titleText = document.createElement('span');
+          titleText.className = 'lyrics-title';
+          titleText.textContent = match[2];
+
+          const indicator = document.createElement('span');
+          indicator.className = 'lyrics-indicator';
+          indicator.setAttribute('aria-hidden', 'true');
+
+          const body = document.createElement('div');
+          body.className = 'lyrics-body';
+          body.id = `lyrics-body-${match[1]}`;
+          body.hidden = true;
+          body.textContent = lines.join('\n').trim();
+
+          toggle.setAttribute('aria-controls', body.id);
+          toggle.append(number, titleText, indicator);
+          title.appendChild(toggle);
+          heading.appendChild(title);
+          article.append(heading, body);
+          fragment.appendChild(article);
+
+          toggle.addEventListener('click', () => {
+            const willOpen = toggle.getAttribute('aria-expanded') === 'false';
+
+            lyricsList.querySelectorAll('.lyrics-toggle[aria-expanded="true"]').forEach(openToggle => {
+              openToggle.setAttribute('aria-expanded', 'false');
+              const openBody = document.getElementById(openToggle.getAttribute('aria-controls'));
+              if (openBody) openBody.hidden = true;
+            });
+
+            if (willOpen) {
+              toggle.setAttribute('aria-expanded', 'true');
+              body.hidden = false;
+            }
+          });
+        });
+
+        lyricsList.replaceChildren(fragment);
+        if (lyricsList.children.length !== 11) {
+          throw new Error('Unexpected record count');
+        }
+      } catch (error) {
+        lyricsList.innerHTML = '<p class="loading-message is-error">記録を読み込めませんでした。</p>';
+      }
+    }
+
+    const ANSWERS = [
+      '628d8b45b82e198186426604d2435ee6968fb5fa6167330d49b7c835af12e909',
+      '2fa47de55aa134b5963f60036b28ffbd257a94b0f9d7e6fe91af653b1ea1a8cb',
+    ];
+
+    const userInput = document.getElementById('access-input');
+    const submitButton = document.getElementById('access-submit');
+    const accessControls = document.getElementById('access-controls');
+    const accessMessage = document.getElementById('access-message');
+    const hiddenContent = document.getElementById('hidden-content');
+    let failedAttempts = 0;
+
+    function clearMessage() {
+      accessMessage.textContent = '';
+    }
+
+    async function createDigest(value) {
+      const data = new TextEncoder().encode(value);
+      const buffer = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(
+        new Uint8Array(buffer),
+        byte => byte.toString(16).padStart(2, '0')
+      ).join('');
+    }
+
+    function showHiddenContent() {
+      accessControls.classList.add('is-leaving');
+      window.setTimeout(() => {
+        accessControls.hidden = true;
+        hiddenContent.hidden = false;
+        hiddenContent.classList.add('is-visible');
+      }, 320);
+    }
+
+    async function checkUserInput() {
+      const normalizedInput = userInput.value
+        .trim()
+        .replace(/\u3000/g, '')
+        .normalize('NFKC');
+
+      submitButton.disabled = true;
+      try {
+        const digest = await createDigest(normalizedInput);
+        if (ANSWERS.includes(digest)) {
+          clearMessage();
+          showHiddenContent();
+          return;
+        }
+
+        failedAttempts += 1;
+        accessMessage.textContent = failedAttempts <= 2
+          ? '該当なし。照合キーは、線の先にある。'
+          : '該当なし。線の先の文字を、順に読め。';
+      } catch (error) {
+        accessMessage.textContent = '照合処理を実行できませんでした。';
+      } finally {
+        submitButton.disabled = false;
+      }
+    }
+
+    submitButton.addEventListener('click', checkUserInput);
+    userInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        checkUserInput();
+      }
+    });
+    userInput.addEventListener('input', clearMessage);
+
+    loadLyrics();
+  </script>
+</body>
+</html>
